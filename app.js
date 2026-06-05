@@ -9,13 +9,11 @@ const ctx = canvas.getContext("2d");
 
 const popup = document.getElementById("loginPopup");
 const overlay = document.getElementById("overlay");
-
 const colorPicker = document.getElementById("color");
 
 const CELL_SIZE = 30;
 
 let currentUser = null;
-
 const pixels = {};
 
 async function checkUser() {
@@ -32,7 +30,6 @@ function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    drawGrid();
     redrawPixels();
 }
 
@@ -43,22 +40,15 @@ function drawGrid() {
 
     for (let x = 0; x < canvas.width; x += CELL_SIZE) {
         for (let y = 0; y < canvas.height; y += CELL_SIZE) {
-            ctx.strokeRect(
-                x,
-                y,
-                CELL_SIZE,
-                CELL_SIZE
-            );
+            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
         }
     }
 }
 
 function redrawPixels() {
-
     drawGrid();
 
     Object.values(pixels).forEach(pixel => {
-
         ctx.fillStyle = pixel.color;
 
         ctx.fillRect(
@@ -74,26 +64,23 @@ function redrawPixels() {
             CELL_SIZE,
             CELL_SIZE
         );
-
     });
 }
 
 resizeCanvas();
 
-document.getElementById("signup").onclick =
-async () => {
+document.getElementById("signup").onclick = async () => {
 
     const email =
-        document.getElementById("email").value;
+        document.getElementById("email").value.trim();
 
     const password =
         document.getElementById("password").value;
 
-    const { error } =
-        await sb.auth.signUp({
-            email,
-            password
-        });
+    const { error } = await sb.auth.signUp({
+        email,
+        password
+    });
 
     if (error) {
         alert(error.message);
@@ -103,11 +90,10 @@ async () => {
     alert("Account created!");
 };
 
-document.getElementById("login").onclick =
-async () => {
+document.getElementById("login").onclick = async () => {
 
     const email =
-        document.getElementById("email").value;
+        document.getElementById("email").value.trim();
 
     const password =
         document.getElementById("password").value;
@@ -131,29 +117,18 @@ async () => {
     alert("Logged in!");
 };
 
-canvas.addEventListener("click",
-async (e) => {
+canvas.addEventListener("click", async (e) => {
 
     if (!currentUser) {
-
         popup.style.display = "block";
         overlay.style.display = "block";
-
         return;
     }
 
-    const x =
-        Math.floor(
-            e.offsetX / CELL_SIZE
-        );
+    const x = Math.floor(e.offsetX / CELL_SIZE);
+    const y = Math.floor(e.offsetY / CELL_SIZE);
 
-    const y =
-        Math.floor(
-            e.offsetY / CELL_SIZE
-        );
-
-    const color =
-        colorPicker.value;
+    const color = colorPicker.value;
 
     pixels[`${x},${y}`] = {
         x,
@@ -163,27 +138,27 @@ async (e) => {
 
     redrawPixels();
 
-    const { error } =
-        await sb
+    const { error } = await sb
         .from("pixels")
         .upsert({
             x,
             y,
-            color
+            color,
+            user_id: currentUser.id
         });
 
     if (error) {
         console.error(error);
+        alert(error.message);
     }
-
 });
 
 async function loadPixels() {
 
     const { data, error } =
         await sb
-        .from("pixels")
-        .select("*");
+            .from("pixels")
+            .select("*");
 
     if (error) {
         console.error(error);
@@ -191,11 +166,7 @@ async function loadPixels() {
     }
 
     data.forEach(pixel => {
-
-        pixels[
-            `${pixel.x},${pixel.y}`
-        ] = pixel;
-
+        pixels[`${pixel.x},${pixel.y}`] = pixel;
     });
 
     redrawPixels();
@@ -203,7 +174,7 @@ async function loadPixels() {
 
 loadPixels();
 
-sb.channel("pixels")
+sb.channel("live-pixels")
 .on(
     "postgres_changes",
     {
@@ -211,16 +182,19 @@ sb.channel("pixels")
         schema: "public",
         table: "pixels"
     },
-    payload => {
+    (payload) => {
+
+        console.log("Realtime update:", payload);
 
         const p = payload.new;
 
-        pixels[
-            `${p.x},${p.y}`
-        ] = p;
+        if (!p) return;
+
+        pixels[`${p.x},${p.y}`] = p;
 
         redrawPixels();
-
     }
 )
-.subscribe();
+.subscribe((status) => {
+    console.log("Realtime status:", status);
+});
