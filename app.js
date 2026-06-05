@@ -7,16 +7,31 @@ const sb = window.supabase.createClient(
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
+const viewport = document.getElementById("viewport");
+
 const popup = document.getElementById("loginPopup");
 const overlay = document.getElementById("overlay");
 const colorPicker = document.getElementById("color");
 
+const WORLD_WIDTH = 1000;
+const WORLD_HEIGHT = 1000;
 const CELL_SIZE = 30;
 
 let currentUser = null;
+
 const pixels = {};
 
+canvas.width = WORLD_WIDTH * CELL_SIZE;
+canvas.height = WORLD_HEIGHT * CELL_SIZE;
+
+viewport.scrollLeft =
+    (canvas.width / 2) - (window.innerWidth / 2);
+
+viewport.scrollTop =
+    (canvas.height / 2) - (window.innerHeight / 2);
+
 async function checkUser() {
+
     const {
         data: { user }
     } = await sb.auth.getUser();
@@ -26,29 +41,44 @@ async function checkUser() {
 
 checkUser();
 
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    redrawPixels();
-}
-
-window.addEventListener("resize", resizeCanvas);
-
 function drawGrid() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let x = 0; x < canvas.width; x += CELL_SIZE) {
-        for (let y = 0; y < canvas.height; y += CELL_SIZE) {
-            ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    for (
+        let x = 0;
+        x < canvas.width;
+        x += CELL_SIZE
+    ) {
+
+        for (
+            let y = 0;
+            y < canvas.height;
+            y += CELL_SIZE
+        ) {
+
+            ctx.strokeRect(
+                x,
+                y,
+                CELL_SIZE,
+                CELL_SIZE
+            );
+
         }
     }
 }
 
 function redrawPixels() {
+
     drawGrid();
 
     Object.values(pixels).forEach(pixel => {
+
         ctx.fillStyle = pixel.color;
 
         ctx.fillRect(
@@ -64,12 +94,15 @@ function redrawPixels() {
             CELL_SIZE,
             CELL_SIZE
         );
+
     });
+
 }
 
-resizeCanvas();
+redrawPixels();
 
-document.getElementById("signup").onclick = async () => {
+document.getElementById("signup").onclick =
+async () => {
 
     const email =
         document.getElementById("email").value.trim();
@@ -77,20 +110,25 @@ document.getElementById("signup").onclick = async () => {
     const password =
         document.getElementById("password").value;
 
-    const { error } = await sb.auth.signUp({
-        email,
-        password
-    });
+    const { error } =
+        await sb.auth.signUp({
+            email,
+            password
+        });
 
     if (error) {
         alert(error.message);
         return;
     }
 
-    alert("Account created!");
+    alert(
+        "Account created. Check email if confirmation is enabled."
+    );
+
 };
 
-document.getElementById("login").onclick = async () => {
+document.getElementById("login").onclick =
+async () => {
 
     const email =
         document.getElementById("email").value.trim();
@@ -98,11 +136,14 @@ document.getElementById("login").onclick = async () => {
     const password =
         document.getElementById("password").value;
 
-    const { data, error } =
-        await sb.auth.signInWithPassword({
-            email,
-            password
-        });
+    const {
+        data,
+        error
+    } =
+    await sb.auth.signInWithPassword({
+        email,
+        password
+    });
 
     if (error) {
         alert(error.message);
@@ -115,61 +156,106 @@ document.getElementById("login").onclick = async () => {
     overlay.style.display = "none";
 
     alert("Logged in!");
+
 };
 
-canvas.addEventListener("click", async (e) => {
+canvas.addEventListener(
+    "click",
+    async (e) => {
 
-    if (!currentUser) {
-        popup.style.display = "block";
-        overlay.style.display = "block";
-        return;
-    }
+        if (!currentUser) {
 
-    const x = Math.floor(e.offsetX / CELL_SIZE);
-    const y = Math.floor(e.offsetY / CELL_SIZE);
+            popup.style.display = "block";
+            overlay.style.display = "block";
 
-    const color = colorPicker.value;
+            return;
+        }
 
-    pixels[`${x},${y}`] = {
-        x,
-        y,
-        color
-    };
+        const rect =
+            canvas.getBoundingClientRect();
 
-    redrawPixels();
+        const x =
+            Math.floor(
+                (e.clientX - rect.left) /
+                CELL_SIZE
+            );
 
-    const { error } = await sb
-        .from("pixels")
-        .upsert({
+        const y =
+            Math.floor(
+                (e.clientY - rect.top) /
+                CELL_SIZE
+            );
+
+        if (
+            x < 0 ||
+            y < 0 ||
+            x >= WORLD_WIDTH ||
+            y >= WORLD_HEIGHT
+        ) {
+            return;
+        }
+
+        const color =
+            colorPicker.value;
+
+        pixels[`${x},${y}`] = {
             x,
             y,
-            color,
-            user_id: currentUser.id
-        });
+            color
+        };
 
-    if (error) {
-        console.error(error);
-        alert(error.message);
+        redrawPixels();
+
+        const { error } =
+            await sb
+            .from("pixels")
+            .upsert({
+                x,
+                y,
+                color,
+                user_id: currentUser.id
+            });
+
+        if (error) {
+
+            console.error(error);
+
+            alert(
+                error.message
+            );
+
+        }
+
     }
-});
+);
 
 async function loadPixels() {
 
-    const { data, error } =
-        await sb
-            .from("pixels")
-            .select("*");
+    const {
+        data,
+        error
+    } =
+    await sb
+        .from("pixels")
+        .select("*");
 
     if (error) {
+
         console.error(error);
+
         return;
     }
 
     data.forEach(pixel => {
-        pixels[`${pixel.x},${pixel.y}`] = pixel;
+
+        pixels[
+            `${pixel.x},${pixel.y}`
+        ] = pixel;
+
     });
 
     redrawPixels();
+
 }
 
 loadPixels();
@@ -184,17 +270,29 @@ sb.channel("live-pixels")
     },
     (payload) => {
 
-        console.log("Realtime update:", payload);
+        console.log(
+            "Realtime update:",
+            payload
+        );
 
-        const p = payload.new;
+        const p =
+            payload.new;
 
         if (!p) return;
 
-        pixels[`${p.x},${p.y}`] = p;
+        pixels[
+            `${p.x},${p.y}`
+        ] = p;
 
         redrawPixels();
+
     }
 )
 .subscribe((status) => {
-    console.log("Realtime status:", status);
+
+    console.log(
+        "Realtime status:",
+        status
+    );
+
 });
