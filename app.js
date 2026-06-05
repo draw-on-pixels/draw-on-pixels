@@ -13,8 +13,8 @@ const popup = document.getElementById("loginPopup");
 const overlay = document.getElementById("overlay");
 const colorPicker = document.getElementById("color");
 
-const WORLD_WIDTH = 1000;
-const WORLD_HEIGHT = 1000;
+const WORLD_WIDTH = 200;
+const WORLD_HEIGHT = 200;
 const CELL_SIZE = 30;
 
 let currentUser = null;
